@@ -16,7 +16,7 @@ import java.io.IOException;
 @Configuration
 public class ElasticsearchConfig extends ElasticsearchRestClientAutoConfiguration {
     String serverUrl = "http://localhost:9200";
-    public static final String INDEX_NAME = "products";
+    public static final String PRODUCTS = "products";
 
     @Bean
     RestClient restClient() {
@@ -34,11 +34,11 @@ public class ElasticsearchConfig extends ElasticsearchRestClientAutoConfiguratio
 
         BooleanResponse indexRes;
         try {
-            indexRes = esClient.indices().exists(ex -> ex.index(INDEX_NAME));
+            indexRes = esClient.indices().exists(ex -> ex.index(PRODUCTS));
 
             if (!indexRes.value()) {
                 esClient.indices().create(c -> c
-                        .index(INDEX_NAME));
+                        .index(PRODUCTS));
 
             }
         } catch (IOException e) {

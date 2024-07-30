@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.List;
 
-import static com.example.digitalChiefTest.config.ElasticsearchConfig.INDEX_NAME;
+import static com.example.digitalChiefTest.config.ElasticsearchConfig.PRODUCTS;
 
 @Service
 public class DataLoadService {
@@ -32,7 +32,7 @@ public class DataLoadService {
             ProductDto productDto = ProductMapper.mapToProductDto(product);
             try {
                 IndexResponse response = esClient.index(i -> i
-                        .index(INDEX_NAME)
+                        .index(PRODUCTS)
                         .id(productDto.id().toString())
                         .document(productDto)
                 );
