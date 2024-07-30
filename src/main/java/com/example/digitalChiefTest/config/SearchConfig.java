@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 @NoArgsConstructor
 public class SearchConfig {
-    private boolean enabled;
+    private Boolean enabled;
     private String color;
-    private boolean availability;
+    private Boolean availability;
 }

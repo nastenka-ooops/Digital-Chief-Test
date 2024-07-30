@@ -1,18 +1,22 @@
 package com.example.digitalChiefTest.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.elasticsearch._types.query_dsl.MatchQuery.Builder;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.MatchQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MultiMatchQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.example.digitalChiefTest.config.SearchConfig;
 import com.example.digitalChiefTest.dto.ProductDto;
+import com.example.digitalChiefTest.dto.SkuDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.example.digitalChiefTest.config.ElasticsearchConfig.PRODUCTS;
 
@@ -28,7 +32,86 @@ public class SearchService {
     }
 
     public List<ProductDto> search(String query) {
-        List<ProductDto> products = new ArrayList<>();
+        // General product search query
+        Query generalQuery = MultiMatchQuery.of(mq -> mq
+                        .fields("name", "description")
+                        .query(query))
+                ._toQuery();
+
+        // SKU level conditions
+        List<Query> skuConditions = new ArrayList<>();
+        if (searchConfig.getEnabled()) {
+            if (searchConfig.getColor() != null) {
+                skuConditions.add(MatchQuery.of(m -> m
+                                .field("skus.color")
+                                .query(searchConfig.getColor()))
+                        ._toQuery());
+            }
+            skuConditions.add(MatchQuery.of(m -> m
+                            .field("skus.availability")
+                            .query(searchConfig.getAvailability()))
+                    ._toQuery());
+
+        }
+
+        // Combine SKU conditions into a nested query
+        Query skuQuery = BoolQuery.of(bq -> bq.must(skuConditions))._toQuery();
+
+        // Combine general product query and SKU query
+        Query combinedQuery = BoolQuery.of(b -> b
+                        .must(generalQuery)
+                        .filter(skuQuery))
+                ._toQuery();
+
+        try {
+            SearchResponse<ProductDto> getProduct = esClient.search(ss -> ss
+                    .index(PRODUCTS)
+                    .query(combinedQuery), ProductDto.class);
+
+            List<ProductDto> allProducts = getProduct.hits().hits().stream()
+                    .map(Hit::source)
+                    .collect(Collectors.toList());
+
+            return filterProductsBySku(allProducts, searchConfig);
+        } catch (IOException e) {
+            throw new RuntimeException("Error while searching products", e);
+        }
+    }
+
+    public List<ProductDto> filterProductsBySku(List<ProductDto> products, SearchConfig searchConfig) {
+        List<ProductDto> filteredProducts = new ArrayList<>();
+
+        for (ProductDto product : products) {
+            List<SkuDto> filteredSkus = product.skus().stream()
+                    .filter(sku -> {
+                        if (searchConfig.getEnabled()){
+                            return (searchConfig.getColor() != null && searchConfig.getColor().equals(sku.color())) ||
+                                    (searchConfig.getAvailability() != null && searchConfig.getAvailability().equals(sku.availability()));
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toList());
+
+            if (!filteredSkus.isEmpty()) {
+                // Update product with only the filtered SKUs
+                ProductDto filteredProduct = new ProductDto(
+                        product.id(),
+                        product.name(),
+                        product.description(),
+                        product.price(),
+                        product.active(),
+                        product.startDate(),
+                        filteredSkus
+                );
+                filteredProducts.add(filteredProduct);
+            }
+        }
+
+        return filteredProducts;
+    }
+
+
+        /*List<ProductDto> products = new ArrayList<>();
 
         List<Query> conditions = new ArrayList<>();
 
@@ -60,6 +143,5 @@ public class SearchService {
         } catch (IOException e) {
             throw new RuntimeException("Error while searching products", e);
         }
-        return products;
-    }
+        return products;*/
 }
