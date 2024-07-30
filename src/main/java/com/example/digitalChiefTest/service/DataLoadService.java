@@ -38,7 +38,7 @@ public class DataLoadService {
                 );
                 System.out.println("Document indexed" + response);
             } catch (IOException e) {
-                throw new RuntimeException("error while indexing product");
+                throw new RuntimeException("error while indexing product", e);
             }
         }
     }
